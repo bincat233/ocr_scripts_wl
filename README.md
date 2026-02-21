@@ -1,12 +1,13 @@
 # OCR Scripts (Wayland)
 
 Screenshot OCR for Wayland:
+
 - Online: use OpenAI API
 - Offline: automatically fall back to tesseract
 
 ## Install
 
-1) Install dependencies (examples):
+1. Install dependencies (examples):
 
 ```bash
 # Arch
@@ -17,13 +18,13 @@ sudo apt update
 sudo apt install -y grim slurp wl-clipboard libnotify-bin coreutils curl jq tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim
 ```
 
-2) Check dependencies:
+1. Check dependencies:
 
 ```bash
 make check-deps
 ```
 
-3) Install scripts (default: `/usr/local/bin`):
+1. Install scripts (default: `/usr/local/bin`):
 
 ```bash
 make install
@@ -40,7 +41,7 @@ make install BINDIR="$HOME/.local/bin"
 Run:
 
 ```bash
-ocr
+ocr.sh
 ```
 
 Flow: select area -> OCR runs -> result is copied to clipboard.

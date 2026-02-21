@@ -4,7 +4,7 @@
 
 ## 安装
 
-1) 安装依赖（示例，按发行版替换包管理器）：
+1. 安装依赖（示例，按发行版替换包管理器）：
 
 ```bash
 # Arch
@@ -15,13 +15,13 @@ sudo apt update
 sudo apt install -y grim slurp wl-clipboard libnotify-bin coreutils curl jq tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim
 ```
 
-2) 检查依赖：
+1. 检查依赖：
 
 ```bash
 make check-deps
 ```
 
-3) 安装脚本（默认 `/usr/local/bin`）：
+1. 安装脚本（默认 `/usr/local/bin`）：
 
 ```bash
 make install
@@ -38,7 +38,7 @@ make install BINDIR="$HOME/.local/bin"
 直接运行：
 
 ```bash
-ocr
+ocr.sh
 ```
 
 操作流程：框选区域 -> 自动 OCR -> 结果复制到剪贴板。
