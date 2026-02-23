@@ -77,11 +77,6 @@ call_openai_realtime_api() {
   local beta_header="${OPENAI_OCR_REALTIME_BETA_HEADER:-OpenAI-Beta: realtime=v1}"
   local events_file out_file combined err_msg
 
-  if ! command -v websocat >/dev/null 2>&1; then
-    printf 'OCR(OpenAI) realtime error: websocat is required for realtime mode but not found.\n' >&2
-    return 1
-  fi
-
   events_file="$(mktemp)"
   out_file="$(mktemp)"
   jq -n \
