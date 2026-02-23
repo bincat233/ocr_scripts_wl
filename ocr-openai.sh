@@ -18,9 +18,9 @@ set +a
 
 : "${OPENAI_API_KEY:?OPENAI_API_KEY is required}"
 
-#MODEL="${OPENAI_OCR_MODEL:-gpt-5-mini}" # 视觉可用模型示例见官方文档示例:contentReference[oaicite:1]{index=1}
-MODEL="${OPENAI_OCR_MODEL:-gpt-4.1-mini}" # 视觉可用模型示例见官方文档示例:contentReference[oaicite:1]{index=1}
-API_URL="${OPENAI_API_URL:-https://api.openai.com/v1/responses}"
+# 视觉可用模型示例见官方文档示例:contentReference[oaicite:1]{index=1}
+MODEL="${OPENAI_OCR_MODEL:-gpt-realtime-mini}"
+API_URL="${OPENAI_API_URL:-https://api.openai.com/v1/realtime}"
 
 # 输出控制
 MAX_OUTPUT_TOKENS="${OPENAI_OCR_MAX_TOKENS:-1200}"
