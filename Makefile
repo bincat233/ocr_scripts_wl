@@ -12,7 +12,7 @@ help:
 
 check-deps:
 	@missing=0; \
-	for cmd in bash grim slurp wl-copy notify-send timeout tesseract curl jq stat base64 mktemp head sed perl websocat; do \
+	for cmd in bash grim slurp wl-copy notify-send timeout tesseract curl jq stat base64 mktemp head sed websocat; do \
 		if ! command -v $$cmd >/dev/null 2>&1; then \
 			echo "missing dependency: $$cmd"; \
 			missing=1; \

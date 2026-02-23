@@ -9,8 +9,7 @@ LANGS="${OCR_LANGS:-eng+chi_sim}"
 text="$(
   grim -g "$(slurp)" -t png - |
     tesseract stdin stdout -l "$LANGS" --psm "${OCR_PSM:-6}" 2>/dev/null |
-    perl -CS -pe 's/(?<=\p{Han})[ \t]+(?=\p{Han})//g' |
-    sed 's/[[:space:]]\+$//' # 去行尾空白
+    sed -E ':a; s/([一-龥])[ \t]+([一-龥])/\1\2/g; ta; s/[[:space:]]\+$//' # 清理中文间空格 + 去行尾空白
 )"
 
 # 空结果直接退出（避免把空覆盖剪贴板）
