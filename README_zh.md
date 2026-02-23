@@ -70,6 +70,7 @@ sudo apt install -y websocat
 ```bash
 OPENAI_OCR_MODEL=gpt-realtime-mini
 OPENAI_API_URL=https://api.openai.com/v1/realtime
+OPENAI_OCR_IMAGE_QUALITY=70
 ```
 
 说明：
