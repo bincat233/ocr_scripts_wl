@@ -1,5 +1,7 @@
 # OCR Scripts (Wayland)
 
+English | [简体中文](README_zh.md)
+
 Wayland screenshot OCR:
 
 - Online: use OpenAI

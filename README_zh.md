@@ -1,5 +1,7 @@
 # OCR Scripts (Wayland)
 
+[English](README.md) | 简体中文
+
 Wayland 截图 OCR：
 
 - 在线：使用 OpenAI
