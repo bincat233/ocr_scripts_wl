@@ -34,6 +34,12 @@ IMAGE_QUALITY="${OPENAI_OCR_IMAGE_QUALITY:-10}"
 # Prompt：尽量“只输出识别文本”，不加解释
 INSTRUCTIONS="${OPENAI_OCR_INSTRUCTIONS:-Extract all text from the image. Output only the extracted raw text. Preserve line breaks. Do not add any commentary.}"
 
+notify_optional() {
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send "$@"
+  fi
+}
+
 build_responses_payload() {
   local model="$1"
   local instructions="$2"
@@ -194,7 +200,7 @@ if [[ "$API_URL" == *"/v1/realtime"* ]] || [[ "$MODEL" == gpt-realtime* ]]; then
       "$MAX_OUTPUT_TOKENS" \
       "$REALTIME_TIMEOUT_SEC"
   )"; then
-    notify-send -u critical -a "OCR(OpenAI)" "API error" "realtime request failed"
+    notify_optional -u critical -a "OCR(OpenAI)" "API error" "realtime request failed"
     printf 'OCR(OpenAI) API error: realtime request failed\n' >&2
     exit 1
   fi
@@ -215,11 +221,11 @@ text="$(sanitize_ocr_text "$text")"
 if [[ -z "${text//[[:space:]]/}" ]]; then
   err="$(printf '%s' "${resp:-}" | jq -r '.error.message? // empty' 2>/dev/null || true)"
   if [[ -n "$err" ]]; then
-    notify-send -u critical -a "OCR(OpenAI)" "API error" "$err"
+    notify_optional -u critical -a "OCR(OpenAI)" "API error" "$err"
     printf 'OCR(OpenAI) API error: %s\n' "$err" >&2
     exit 1
   fi
-  notify-send -u low -a "OCR(OpenAI)" "No text detected"
+  notify_optional -u low -a "OCR(OpenAI)" "No text detected"
   exit 0
 fi
 
@@ -227,4 +233,4 @@ fi
 printf '%s' "$text" | wl-copy
 
 preview="$(printf '%s' "$text" | head -c 200)"
-notify-send -u low -a "OCR(OpenAI)" "Copied to clipboard" "$preview"
+notify_optional -u low -a "OCR(OpenAI)" "Copied to clipboard" "$preview"

@@ -12,12 +12,18 @@ help:
 
 check-deps:
 	@missing=0; \
-	for cmd in bash grim slurp wl-copy notify-send timeout tesseract curl jq stat base64 mktemp head sed websocat; do \
+	for cmd in bash grim slurp wl-copy timeout tesseract curl jq stat base64 mktemp head sed; do \
 		if ! command -v $$cmd >/dev/null 2>&1; then \
 			echo "missing dependency: $$cmd"; \
 			missing=1; \
 		fi; \
 	done; \
+	if ! command -v websocat >/dev/null 2>&1; then \
+		echo "warning: optional dependency missing: websocat (required for realtime mode)"; \
+	fi; \
+	if ! command -v notify-send >/dev/null 2>&1; then \
+		echo "warning: optional dependency missing: notify-send (desktop notifications disabled)"; \
+	fi; \
 	if [ $$missing -ne 0 ]; then \
 		echo "dependency check failed"; \
 		exit 1; \

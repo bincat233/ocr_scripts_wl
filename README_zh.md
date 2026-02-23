@@ -1,10 +1,19 @@
 # OCR Scripts (Wayland)
 
-截图 OCR：在线走 OpenAI，离线自动回退 tesseract。
+Wayland 截图 OCR：
 
-## 安装
+- 在线：使用 OpenAI
+- 离线：自动回退到 tesseract
 
-1. 安装依赖（示例，按发行版替换包管理器）：
+## 安装配置
+
+**检查依赖:**
+
+```bash
+make check-deps
+```
+
+**安装依赖**（示例，按发行版替换包管理器）:
 
 ```bash
 # Arch
@@ -15,13 +24,7 @@ sudo apt update
 sudo apt install -y grim slurp wl-clipboard libnotify-bin coreutils curl jq tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim
 ```
 
-1. 检查依赖：
-
-```bash
-make check-deps
-```
-
-1. 安装脚本（默认 `/usr/local/bin`）：
+**安装脚本**（默认 `/usr/local/bin`）:
 
 ```bash
 make install
@@ -33,6 +36,15 @@ make install
 make install BINDIR="$HOME/.local/bin"
 ```
 
+**复制配置文件并设置自己的 OpenAI Key**:
+
+```bash
+MY_OPENAI_KEY=sk-xxxxxx
+mkdir -p ~/.config
+cp ocr_scripts_wl.conf ~/.config/ocr_scripts_wl.conf
+sed -i "s/^\(OPENAI_API_KEY=\).*/\1$MY_OPENAI_KEY/" ~/.config/ocr_scripts_wl.conf
+```
+
 ## 使用
 
 直接运行：
@@ -41,42 +53,34 @@ make install BINDIR="$HOME/.local/bin"
 ocr.sh
 ```
 
-操作流程：框选区域 -> 自动 OCR -> 结果复制到剪贴板。
+或将脚本绑定至桌面环境的快捷键
 
-## OpenAI 最小配置
+Gnome：`设置 -> 键盘 -> 查看及自定义快捷键 -> 自定义快捷键`，添加命令 `ocr.sh` 并绑定按键。
 
-```bash
-mkdir -p ~/.config
-cat > ~/.config/openai.env <<'ENV'
-OPENAI_API_KEY=sk-xxxxx
-ENV
-chmod 600 ~/.config/openai.env
-```
+sway：在 `~/.config/sway/config` 添加 `bindsym $mod+Shift+o exec --no-startup-id ocr.sh`，然后执行 `swaymsg reload`。
 
-脚本也会从 `~/.config/openai.env` 读取 key。
+流程：框选区域 -> 自动 OCR -> 结果复制到剪贴板。
 
-## Realtime 模式（gpt-realtime-mini）
+## 配置
 
-需要额外安装 `websocat`：
+配置文件：`~/.config/ocr_scripts_wl.conf`
 
-```bash
-# Arch
-sudo pacman -S --needed websocat
+此外, 脚本也会从 `~/.config/openai.env` 读取 `OPENAI_API_KEY`。
 
-# Ubuntu
-sudo apt install -y websocat
-```
+参数说明：
 
-主配置文件：`~/.config/ocr_scripts_wl.conf`（`x="y"` 格式）
+- `OPENAI_API_KEY`：OpenAI API Key。
+- `OPENAI_API_URL`：接口地址。可用 `https://api.openai.com/v1/realtime` 或 `https://api.openai.com/v1/responses`。
+- `OPENAI_OCR_MODEL`：模型名，例如 `gpt-realtime-mini`、`gpt-realtime`、`gpt-4o-mini`。
+- `OPENAI_OCR_MAX_TOKENS`：最大输出 token 数。
+- `OPENAI_OCR_REALTIME_TIMEOUT_SEC`：Realtime 请求超时秒数。
+- `OPENAI_OCR_IMAGE_QUALITY`：截图 JPEG 质量（`grim -q`），越高越清晰，体积也越大。
+- `OPENAI_OCR_INSTRUCTIONS`：OCR 提示词。
 
-```bash
-mkdir -p ~/.config
-cat > ~/.config/ocr_scripts_wl.conf <<'CONF'
-OPENAI_OCR_MODEL=gpt-realtime-mini
-OPENAI_API_URL=https://api.openai.com/v1/realtime
-OPENAI_OCR_IMAGE_QUALITY=70
-CONF
-```
+补充：
 
-说明：
-- 脚本会通过 Realtime WebSocket 发送 OCR 请求。
+- 使用 Realtime API 更快，需安装 `websocat`
+  - 并把 `OPENAI_API_URL` 设为 `https://api.openai.com/v1/realtime`
+  - 模型设为 `OPENAI_OCR_MODEL=gpt-realtime-mini` 或 `OPENAI_OCR_MODEL=gpt-realtime`。
+- 未配置时使用脚本内默认值。
+- 脚本会先读取 `~/.config/ocr_scripts_wl.conf`，再读取 `~/.config/openai.env`。
