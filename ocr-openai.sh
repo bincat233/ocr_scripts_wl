@@ -25,9 +25,10 @@ API_URL="${OPENAI_API_URL:-https://api.openai.com/v1/responses}"
 # 输出控制
 MAX_OUTPUT_TOKENS="${OPENAI_OCR_MAX_TOKENS:-1200}"
 REALTIME_TIMEOUT_SEC="${OPENAI_OCR_REALTIME_TIMEOUT_SEC:-45}"
+IMAGE_QUALITY="${OPENAI_OCR_IMAGE_QUALITY:-2}"
 
 # Prompt：尽量“只输出识别文本”，不加解释
-INSTRUCTIONS="${OPENAI_OCR_INSTRUCTIONS:-Extract all text from the image. Output only the extracted text. Preserve line breaks. Do not add any commentary.}"
+INSTRUCTIONS="${OPENAI_OCR_INSTRUCTIONS:-Extract all text from the image. Output only the extracted raw text. Preserve line breaks. Do not add any commentary.}"
 
 build_responses_payload() {
   local model="$1"
@@ -112,9 +113,9 @@ call_openai_realtime_api() {
 
   if ! timeout "${timeout_sec}"s \
     websocat -q -t -E -B 8388608 \
-      -H "Authorization: Bearer ${api_key}" \
-      -H "${beta_header}" \
-      "${ws_url}" <"$events_file" >"$out_file"; then
+    -H "Authorization: Bearer ${api_key}" \
+    -H "${beta_header}" \
+    "${ws_url}" <"$events_file" >"$out_file"; then
     rm -f "$events_file" "$out_file"
     printf 'OCR(OpenAI) realtime error: websocket request failed or timed out.\n' >&2
     return 1
@@ -166,14 +167,14 @@ extract_text_from_responses() {
            | join("")'
 }
 
-tmp_img="$(mktemp --suffix=.png)"
+tmp_img="$(mktemp --suffix=.jpg)"
 trap 'rm -f "$tmp_img"' EXIT
 
 geom="$(slurp)"
-grim -g "$geom" -t jpeg -q 2 "$tmp_img"
+grim -g "$geom" -t jpeg -q "$IMAGE_QUALITY" "$tmp_img"
 
 b64="$(base64 -w0 <"$tmp_img")"
-data_url="data:image/png;base64,${b64}"
+data_url="data:image/jpeg;base64,${b64}"
 
 if [[ "$API_URL" == *"/v1/realtime"* ]] || [[ "$MODEL" == gpt-realtime* ]]; then
   text="$(
