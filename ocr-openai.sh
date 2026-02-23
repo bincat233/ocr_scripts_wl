@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# deps: grim slurp wl-clipboard curl jq (perl 可选，用于中文空格清理)
-# paru -S --needed grim slurp wl-clipboard curl jq perl
+# deps: grim slurp wl-clipboard curl jq (websocat 可选: realtime 模式) (perl 可选，用于中文空格清理)
+# paru -S --needed grim slurp wl-clipboard curl jq websocat perl
 ENV_FILE="${OPENAI_ENV_FILE:-$HOME/.config/openai.env}"
 
 # Try to export API Key
@@ -19,31 +19,27 @@ set +a
 : "${OPENAI_API_KEY:?OPENAI_API_KEY is required}"
 
 # 视觉可用模型示例见官方文档示例:contentReference[oaicite:1]{index=1}
-MODEL="${OPENAI_OCR_MODEL:-gpt-realtime-mini}"
-API_URL="${OPENAI_API_URL:-https://api.openai.com/v1/realtime}"
+MODEL="${OPENAI_OCR_MODEL:-gpt-4o-mini}"
+API_URL="${OPENAI_API_URL:-https://api.openai.com/v1/responses}"
 
 # 输出控制
 MAX_OUTPUT_TOKENS="${OPENAI_OCR_MAX_TOKENS:-1200}"
+REALTIME_TIMEOUT_SEC="${OPENAI_OCR_REALTIME_TIMEOUT_SEC:-45}"
 
 # Prompt：尽量“只输出识别文本”，不加解释
 INSTRUCTIONS="${OPENAI_OCR_INSTRUCTIONS:-Extract all text from the image. Output only the extracted text. Preserve line breaks. Do not add any commentary.}"
 
-tmp_img="$(mktemp --suffix=.png)"
-trap 'rm -f "$tmp_img"' EXIT
+build_responses_payload() {
+  local model="$1"
+  local instructions="$2"
+  local image_data_url="$3"
+  local max_tokens="$4"
 
-geom="$(slurp)"
-grim -g "$geom" -t jpeg -q 2 "$tmp_img"
-
-b64="$(base64 -w0 <"$tmp_img")"
-data_url="data:image/png;base64,${b64}"
-
-# 用 jq 生成 JSON，避免 shell 引号/转义问题（不需要 python）
-payload="$(
   jq -n \
-    --arg model "$MODEL" \
-    --arg instr "$INSTRUCTIONS" \
-    --arg img "$data_url" \
-    --argjson max_tokens "$MAX_OUTPUT_TOKENS" \
+    --arg model "$model" \
+    --arg instr "$instructions" \
+    --arg img "$image_data_url" \
+    --argjson max_tokens "$max_tokens" \
     '{
       model: $model,
       instructions: $instr,
@@ -56,30 +52,162 @@ payload="$(
         ]
       }]
     }'
-)"
+}
 
-# 请求
-resp="$(
-  curl -sS "$API_URL" \
+call_openai_responses_api() {
+  local api_url="$1"
+  local api_key="$2"
+  local payload="$3"
+
+  curl -sS "$api_url" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $OPENAI_API_KEY" \
+    -H "Authorization: Bearer $api_key" \
     -d "$payload"
-)"
+}
 
-# 提取文本：遍历 output -> message -> content -> output_text
-text="$(
-  printf '%s' "$resp" |
-    jq -r '[.output[]? 
-            | select(.type=="message") 
-            | .content[]? 
-            | select(.type=="output_text") 
-            | .text] 
+call_openai_realtime_api() {
+  local model="$1"
+  local api_key="$2"
+  local instructions="$3"
+  local image_data_url="$4"
+  local max_tokens="$5"
+  local timeout_sec="$6"
+  local ws_url="wss://api.openai.com/v1/realtime?model=${model}"
+  local beta_header="${OPENAI_OCR_REALTIME_BETA_HEADER:-OpenAI-Beta: realtime=v1}"
+  local events_file out_file combined err_msg
+
+  if ! command -v websocat >/dev/null 2>&1; then
+    printf 'OCR(OpenAI) realtime error: websocat is required for realtime mode but not found.\n' >&2
+    return 1
+  fi
+
+  events_file="$(mktemp)"
+  out_file="$(mktemp)"
+  jq -n \
+    --arg img "$image_data_url" \
+    '{
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: "OCR this image." },
+          { type: "input_image", image_url: $img }
+        ]
+      }
+    }' >"$events_file"
+  printf '\n' >>"$events_file"
+  jq -n \
+    --arg instr "$instructions" \
+    --argjson max_tokens "$max_tokens" \
+    '{
+      type: "response.create",
+      response: {
+        modalities: ["text"],
+        instructions: $instr,
+        max_output_tokens: $max_tokens
+      }
+    }' >>"$events_file"
+  printf '\n' >>"$events_file"
+
+  if ! timeout "${timeout_sec}"s \
+    websocat -q -t -E -B 8388608 \
+      -H "Authorization: Bearer ${api_key}" \
+      -H "${beta_header}" \
+      "${ws_url}" <"$events_file" >"$out_file"; then
+    rm -f "$events_file" "$out_file"
+    printf 'OCR(OpenAI) realtime error: websocket request failed or timed out.\n' >&2
+    return 1
+  fi
+
+  combined="$(
+    jq -Rr '
+      try (
+        fromjson
+        | if .type == "response.output_text.delta" then .delta // ""
+          elif .type == "response.output_text.done" then .text // ""
+          else ""
+          end
+      ) catch ""
+    ' "$out_file" | tr -d '\000'
+  )"
+  rm -f "$events_file"
+  if [[ -n "${combined//[[:space:]]/}" ]]; then
+    rm -f "$out_file"
+    printf '%s' "$combined"
+    return 0
+  fi
+
+  err_msg="$(
+    jq -Rr '
+      try (
+        fromjson
+        | if .type == "error" then .error.message // .message // ""
+          elif .type == "response.done" then (.response.status_details.error.message // "")
+          else ""
+          end
+      ) catch ""
+    ' "$out_file" | awk 'NF{print; exit}'
+  )"
+  rm -f "$out_file"
+  [[ -n "$err_msg" ]] && printf '%s\n' "$err_msg" >&2
+  return 1
+}
+
+extract_text_from_responses() {
+  local response_json="$1"
+
+  printf '%s' "$response_json" |
+    jq -r '[.output[]?
+            | select(.type=="message")
+            | .content[]?
+            | select(.type=="output_text")
+            | .text]
            | join("")'
-)"
+}
+
+tmp_img="$(mktemp --suffix=.png)"
+trap 'rm -f "$tmp_img"' EXIT
+
+geom="$(slurp)"
+grim -g "$geom" -t jpeg -q 2 "$tmp_img"
+
+b64="$(base64 -w0 <"$tmp_img")"
+data_url="data:image/png;base64,${b64}"
+
+if [[ "$API_URL" == *"/v1/realtime"* ]] || [[ "$MODEL" == gpt-realtime* ]]; then
+  text="$(
+    call_openai_realtime_api \
+      "$MODEL" \
+      "$OPENAI_API_KEY" \
+      "$INSTRUCTIONS" \
+      "$data_url" \
+      "$MAX_OUTPUT_TOKENS" \
+      "$REALTIME_TIMEOUT_SEC" || true
+  )"
+  if [[ -z "${text//[[:space:]]/}" ]]; then
+    fallback_model="${OPENAI_OCR_FALLBACK_MODEL:-gpt-4o-mini}"
+    fallback_url="https://api.openai.com/v1/responses"
+    printf 'warning: realtime failed, fallback to responses (%s, %s)\n' "$fallback_url" "$fallback_model" >&2
+    MODEL="$fallback_model"
+    API_URL="$fallback_url"
+  fi
+fi
+
+if [[ -z "${text+x}" ]] || [[ -z "${text//[[:space:]]/}" ]]; then
+  # 用 jq 生成 JSON，避免 shell 引号/转义问题（不需要 python）
+  payload="$(build_responses_payload "$MODEL" "$INSTRUCTIONS" "$data_url" "$MAX_OUTPUT_TOKENS")"
+
+  # 请求
+  resp="$(call_openai_responses_api "$API_URL" "$OPENAI_API_KEY" "$payload")"
+
+  # 提取文本：遍历 output -> message -> content -> output_text
+  text="$(extract_text_from_responses "$resp")"
+fi
 
 # API 返回错误时，通常没有上面的结构；兜底把 error.message 打出来
 if [[ -z "${text//[[:space:]]/}" ]]; then
-  err="$(printf '%s' "$resp" | jq -r '.error.message? // empty')"
+  err="$(printf '%s' "${resp:-}" | jq -r '.error.message? // empty' 2>/dev/null || true)"
   if [[ -n "$err" ]]; then
     notify-send -u critical -a "OCR(OpenAI)" "API error" "$err"
     printf 'OCR(OpenAI) API error: %s\n' "$err" >&2

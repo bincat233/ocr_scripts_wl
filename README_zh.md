@@ -52,3 +52,26 @@ OPENAI_API_KEY=sk-xxxxx
 ENV
 chmod 600 ~/.config/openai.env
 ```
+
+## Realtime 模式（gpt-realtime-mini）
+
+需要额外安装 `websocat`：
+
+```bash
+# Arch
+sudo pacman -S --needed websocat
+
+# Ubuntu
+sudo apt install -y websocat
+```
+
+在 `~/.config/openai.env` 里加上：
+
+```bash
+OPENAI_OCR_MODEL=gpt-realtime-mini
+OPENAI_API_URL=https://api.openai.com/v1/realtime
+```
+
+说明：
+- 脚本会通过 Realtime WebSocket 发送 OCR 请求。
+- 如果 realtime 失败，会自动回退到 `responses`（默认 `gpt-4o-mini`）。
