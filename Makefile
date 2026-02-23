@@ -24,7 +24,7 @@ check-deps:
 	fi; \
 	echo "dependencies: OK"
 
-install:
+install: check-deps
 	@mkdir -p "$(BINDIR)"
 	@install -m 755 ocr.sh "$(BINDIR)/ocr.sh"
 	@install -m 755 ocr-openai.sh "$(BINDIR)/ocr-openai.sh"
