@@ -3,10 +3,14 @@ set -euo pipefail
 
 # deps: grim slurp wl-clipboard curl jq (websocat 可选: realtime 模式)
 # paru -S --needed grim slurp wl-clipboard curl jq websocat
+CONF_FILE="${OCR_CONFIG_FILE:-$HOME/.config/ocr_scripts_wl.conf}"
 ENV_FILE="${OPENAI_ENV_FILE:-$HOME/.config/openai.env}"
 
-# Try to export API Key
+# Load config files
 set -a
+if [ -f "$CONF_FILE" ]; then
+  source "$CONF_FILE"
+fi
 if [ -f "$ENV_FILE" ]; then
   env_perm="$(stat -c '%a' "$ENV_FILE" 2>/dev/null || true)"
   if [ -n "$env_perm" ] && [ "$env_perm" != "600" ]; then

@@ -56,6 +56,8 @@ ENV
 chmod 600 ~/.config/openai.env
 ```
 
+The script also reads the key from `~/.config/openai.env`.
+
 ## Realtime Mode (`gpt-realtime-mini`)
 
 Install extra dependency `websocat`:
@@ -68,14 +70,16 @@ sudo pacman -S --needed websocat
 sudo apt install -y websocat
 ```
 
-Add to `~/.config/openai.env`:
+Main config file: `~/.config/ocr_scripts_wl.conf` (`x="y"` format)
 
 ```bash
+mkdir -p ~/.config
+cat > ~/.config/ocr_scripts_wl.conf <<'CONF'
 OPENAI_OCR_MODEL=gpt-realtime-mini
 OPENAI_API_URL=https://api.openai.com/v1/realtime
 OPENAI_OCR_IMAGE_QUALITY=70
+CONF
 ```
 
 Notes:
 - The script sends OCR requests via Realtime WebSocket.
-- If realtime fails, it auto-falls back to `responses` (default `gpt-4o-mini`).
