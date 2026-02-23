@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# deps: grim slurp wl-clipboard curl jq (websocat 可选: realtime 模式) (perl 可选，用于中文空格清理)
-# paru -S --needed grim slurp wl-clipboard curl jq websocat perl
+# deps: grim slurp wl-clipboard curl jq (websocat 可选: realtime 模式)
+# paru -S --needed grim slurp wl-clipboard curl jq websocat
 ENV_FILE="${OPENAI_ENV_FILE:-$HOME/.config/openai.env}"
 
 # Try to export API Key
@@ -181,25 +181,20 @@ b64="$(base64 -w0 <"$tmp_img")"
 data_url="data:image/jpeg;base64,${b64}"
 
 if [[ "$API_URL" == *"/v1/realtime"* ]] || [[ "$MODEL" == gpt-realtime* ]]; then
-  text="$(
+  if ! text="$(
     call_openai_realtime_api \
       "$MODEL" \
       "$OPENAI_API_KEY" \
       "$INSTRUCTIONS" \
       "$data_url" \
       "$MAX_OUTPUT_TOKENS" \
-      "$REALTIME_TIMEOUT_SEC" || true
-  )"
-  if [[ -z "${text//[[:space:]]/}" ]]; then
-    fallback_model="${OPENAI_OCR_FALLBACK_MODEL:-gpt-4o-mini}"
-    fallback_url="https://api.openai.com/v1/responses"
-    printf 'warning: realtime failed, fallback to responses (%s, %s)\n' "$fallback_url" "$fallback_model" >&2
-    MODEL="$fallback_model"
-    API_URL="$fallback_url"
+      "$REALTIME_TIMEOUT_SEC"
+  )"; then
+    notify-send -u critical -a "OCR(OpenAI)" "API error" "realtime request failed"
+    printf 'OCR(OpenAI) API error: realtime request failed\n' >&2
+    exit 1
   fi
-fi
-
-if [[ -z "${text+x}" ]] || [[ -z "${text//[[:space:]]/}" ]]; then
+else
   # 用 jq 生成 JSON，避免 shell 引号/转义问题（不需要 python）
   payload="$(build_responses_payload "$MODEL" "$INSTRUCTIONS" "$data_url" "$MAX_OUTPUT_TOKENS")"
 
