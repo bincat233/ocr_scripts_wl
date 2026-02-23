@@ -25,7 +25,7 @@ API_URL="${OPENAI_API_URL:-https://api.openai.com/v1/responses}"
 # 输出控制
 MAX_OUTPUT_TOKENS="${OPENAI_OCR_MAX_TOKENS:-1200}"
 REALTIME_TIMEOUT_SEC="${OPENAI_OCR_REALTIME_TIMEOUT_SEC:-45}"
-IMAGE_QUALITY="${OPENAI_OCR_IMAGE_QUALITY:-2}"
+IMAGE_QUALITY="${OPENAI_OCR_IMAGE_QUALITY:-10}"
 
 # Prompt：尽量“只输出识别文本”，不加解释
 INSTRUCTIONS="${OPENAI_OCR_INSTRUCTIONS:-Extract all text from the image. Output only the extracted raw text. Preserve line breaks. Do not add any commentary.}"
@@ -167,6 +167,15 @@ extract_text_from_responses() {
            | join("")'
 }
 
+sanitize_ocr_text() {
+  local raw_text="$1"
+
+  printf '%s' "$raw_text" | sed -E '
+    1s/^```[[:alnum:]_-]*[[:space:]]*$//
+    $s/^[[:space:]]*```[[:space:]]*$//
+  '
+}
+
 tmp_img="$(mktemp --suffix=.jpg)"
 trap 'rm -f "$tmp_img"' EXIT
 
@@ -205,6 +214,8 @@ if [[ -z "${text+x}" ]] || [[ -z "${text//[[:space:]]/}" ]]; then
   # 提取文本：遍历 output -> message -> content -> output_text
   text="$(extract_text_from_responses "$resp")"
 fi
+
+text="$(sanitize_ocr_text "$text")"
 
 # API 返回错误时，通常没有上面的结构；兜底把 error.message 打出来
 if [[ -z "${text//[[:space:]]/}" ]]; then
